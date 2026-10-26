@@ -38,6 +38,8 @@ launch, with a manual "locate the binary" fallback for tools winget does not car
 
 ## Docs
 
+- [Implementation plan](docs/implementation-plan.md) — locked decisions, milestones,
+  behaviour-parity checklist, risks
 - [Hardware acceleration detection](docs/hardware-acceleration.md) — why encoder
   enumeration is insufficient, the probe/benchmark pipeline, and per-encoder profiles
 
