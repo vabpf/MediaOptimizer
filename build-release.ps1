@@ -35,9 +35,12 @@ $notesDst = Join-Path $distDir "$name.notes.md"
 # end users should not see a "packaging" folder.
 $payload = @(
     [pscustomobject]@{ Source = 'MediaOptimizer.cmd';    Target = 'MediaOptimizer.cmd' }
+    [pscustomobject]@{ Source = 'Create-Shortcut.cmd';   Target = 'Create-Shortcut.cmd' }
     [pscustomobject]@{ Source = 'launcher.ps1';          Target = 'launcher.ps1' }
+    [pscustomobject]@{ Source = 'create-shortcut.ps1';   Target = 'create-shortcut.ps1' }
     [pscustomobject]@{ Source = 'optimize.ps1';          Target = 'optimize.ps1' }
     [pscustomobject]@{ Source = 'optimize.cmd';          Target = 'optimize.cmd' }
+    [pscustomobject]@{ Source = 'MediaOptimizer.ico';    Target = 'MediaOptimizer.ico'; Binary = $true }
     [pscustomobject]@{ Source = 'packaging\README.txt';  Target = 'README.txt' }
 )
 
@@ -150,8 +153,25 @@ if (Test-Path -LiteralPath $notesDst) { Remove-Item -LiteralPath $notesDst -Forc
 New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
 
 foreach ($item in $payload) {
+    $source = Join-Path $repoRoot $item.Source
     $target = Join-Path $stageDir $item.Target
-    Copy-Item -LiteralPath (Join-Path $repoRoot $item.Source) -Destination $target -Force
+
+    Copy-Item -LiteralPath $source -Destination $target -Force
+
+    # Binary payloads must be copied verbatim. Rewriting line endings inside an
+    # .ico corrupts the image data while still leaving a file of plausible size,
+    # so assert the bytes are untouched rather than trusting the copy.
+    if ($item.Binary) {
+        $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+        $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+
+        if ($sourceHash -ne $targetHash) {
+            Fail "binary payload was modified while staging: $($item.Target)"
+        }
+
+        continue
+    }
+
     Convert-ToCrlf -Path $target
     Assert-MsDosLineEndings -Path $target
 }

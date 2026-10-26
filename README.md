@@ -26,12 +26,37 @@ do not need `cjpegli`, and `exiftool` is optional.
 | File | Purpose |
 |---|---|
 | `MediaOptimizer.cmd` | **Interactive.** Double-click it, or drop a folder onto it. |
+| `Create-Shortcut.cmd` | **Optional install.** Copies to `%LOCALAPPDATA%` and adds a Start menu entry. |
 | `launcher.ps1` | Prompt, path validation, dependency heads-up. |
+| `create-shortcut.ps1` | Install and removal logic behind `Create-Shortcut.cmd`. |
 | `optimize.cmd` | **Non-interactive.** For scripts and scheduled tasks. |
 | `optimize.ps1` | The engine. Unmodified; `launcher.ps1` only supplies `-Path`. |
+| `MediaOptimizer.ico` | Nine-size icon used by the Start menu entry. |
 
 Supported input: MP4, MOV, JPG, JPEG — scanned recursively. Existing `optimized/` folders
 and `opt_*` files are skipped, so re-running does not reprocess its own output.
+
+## Start menu shortcut
+
+`Create-Shortcut.cmd` does a per-user install: copy the runtime files to
+`%LOCALAPPDATA%\Programs\MediaOptimizer`, then create a Start menu shortcut pointing at
+that copy, so the folder you downloaded can be deleted afterwards. No admin rights, no
+registry writes, no services, no `PATH` changes.
+
+```
+Create-Shortcut.cmd             install + Start menu entry
+Create-Shortcut.cmd -NoInstall  shortcut only, keep the files where they are
+Create-Shortcut.cmd -Remove     undo both
+```
+
+Pinning to Start is the one step that cannot be automated. Windows 10 and 11 have no
+supported API for an application to pin itself — the old `pintostart` verb was removed —
+so the shortcut lands in Start search and under All apps, and the user right-clicks it
+once. The installer prints those steps.
+
+`-Remove` run from the installed folder cannot delete that folder immediately, because
+`cmd.exe` reads batch files line by line and would fail mid-run. It hands the delete to a
+hidden helper that waits for the console to exit, then removes the folder.
 
 ## Behaviour
 
@@ -42,8 +67,9 @@ and `opt_*` files are skipped, so re-running does not reprocess its own output.
 
 ## Packaging
 
-`build-release.ps1 -Version 1.0.0` produces `dist\MediaOptimizer-script-1.0.0.zip`, a
-`.sha256` sidecar, and a notes file with the checksum appended. It syntax-checks both
-PowerShell files with the running parser, normalizes line endings to CRLF, and asserts
-that every archive entry exists and uses forward-slash separators. Nothing is published
-automatically — the `gh release create` command is printed at the end.
+`build-release.ps1 -Version 1.0.1` produces `dist\MediaOptimizer-script-1.0.1.zip`, a
+`.sha256` sidecar, and a notes file with the checksum appended. It syntax-checks every
+PowerShell file in the payload, normalizes line endings to CRLF, copies binary payloads
+byte-for-byte while asserting their hashes, and asserts that every archive entry exists
+and uses forward-slash separators. Nothing is published automatically — the
+`gh release create` command is printed at the end.

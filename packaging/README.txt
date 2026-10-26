@@ -48,15 +48,42 @@ Then extract and run. If you already extracted, unblock
 MediaOptimizer.cmd the same way (right-click, Properties, Unblock).
 
 
+START MENU SHORTCUT (optional)
+------------------------------
+Double-click Create-Shortcut.cmd once. It copies Media Optimizer to
+
+    C:\Users\<you>\AppData\Local\Programs\MediaOptimizer
+
+and adds it to the Start menu, so it appears in Start search and under
+All apps. After that you can delete the folder you downloaded.
+
+To put it on the Start screen as a tile, press the Windows key, type
+"media optimizer", right-click the result, and choose Pin to Start.
+Windows does not allow an app to pin itself, so that last click is
+yours to make.
+
+No admin rights, no registry keys, no services. To undo it:
+
+    Create-Shortcut.cmd -Remove
+
+To keep the files where they are and only create the shortcut:
+
+    Create-Shortcut.cmd -NoInstall
+
+(The shortcut then points at this folder, so do not move or rename it.)
+
+
 FILES
 -----
   MediaOptimizer.cmd   Double-click this. Asks for a folder or a file.
+  Create-Shortcut.cmd  Optional. Installs it and adds a Start entry.
   launcher.ps1         Prompt and checks. Used by MediaOptimizer.cmd.
   optimize.ps1         The engine that does the work.
   optimize.cmd         Non-interactive, for scheduled tasks:
                        optimize.cmd "D:\Folder"
+  MediaOptimizer.ico   Icon for the Start menu shortcut.
 
-Keep all four files in the same folder.
+Keep all the files in the same folder.
 
 
 WHERE RESULTS GO
