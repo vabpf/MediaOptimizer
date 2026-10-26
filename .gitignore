@@ -1,0 +1,17 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+*.user
+.vs/
+
+# Tool output — the app writes optimized media here
+optimized/
+*.log
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Local hardware probe cache / benchmark artifacts
+.hwprobe/
