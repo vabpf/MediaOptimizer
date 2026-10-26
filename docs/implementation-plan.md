@@ -111,7 +111,7 @@ Extracted from `optimize.ps1`. Every row becomes a test or an explicit acceptanc
 
 | # | Behaviour | Note |
 |---|---|---|
-| 1 | Recursive scan of `mp4`, `mov`, `jpg`, `jpeg` | case-insensitive |
+| 1 | Recursive scan of `mp4`, `mov`, `jpg`, `jpeg`, **or a single file** of those types | case-insensitive |
 | 2 | Exclude any path segment `optimized`; exclude `opt_*` files | regex in script |
 | 3 | Output mirrors source tree under `optimized\` | preserves structure |
 | 4 | `optimized\` created *before* scanning | prevents self-inclusion |
@@ -173,7 +173,7 @@ encoder, and an unusable one is never selected. Cache hit ⇒ no probing on rela
 
 ### M3 — Pipeline (2.5 d)
 
-- `MediaScanner` implementing §4 rows 1–4
+- `MediaScanner` implementing §4 rows 1–4, including single-file input
 - `FfmpegRunner`: `-progress pipe:1`, async parsing, `JobObject` cancel
   (`KILL_ON_JOB_CLOSE` so cancel never orphans `ffmpeg.exe`)
 - `JpegliRunner`
@@ -216,6 +216,8 @@ These are cheap, and they remove the script's worst user-facing outcomes:
 | Demote a failing encoder mid-run | Smoke test can pass while real media fails (10-bit, unusual profile). Fall back instead of failing every file. |
 | Surface the `optimized\` overwrite count | Re-runs currently overwrite silently. Show "overwriting N existing files" with a skip option. |
 | Block sleep during a run | A 2-hour batch dying to a laptop lid is a bad first impression. |
+| **Accept a single file as input** | Dropping one video or photo to re-encode is common; the scripted release supports it, so the app must match. |
+| **Scope the tool check to the selection** | A photo-only folder must not be blocked by a missing `ffmpeg`, and vice versa. The scripted release already behaves this way. |
 
 ---
 
