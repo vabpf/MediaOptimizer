@@ -1,0 +1,10 @@
+# Windows-only project: normalise to CRLF so line endings don't churn
+* text=auto eol=crlf
+
+# Binary media and assets
+*.png binary
+*.ico binary
+*.jpg binary
+*.mp4 binary
+*.exe binary
+*.dll binary
