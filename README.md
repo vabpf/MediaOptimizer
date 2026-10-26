@@ -39,3 +39,11 @@ and `opt_*` files are skipped, so re-running does not reprocess its own output.
 - Live progress, per-file savings, and a batch ETA
 - Failures are isolated per file and reported with the tool's own diagnostics
 - Video timestamps and photo EXIF are carried over via `exiftool` when available
+
+## Packaging
+
+`build-release.ps1 -Version 1.0.0` produces `dist\MediaOptimizer-script-1.0.0.zip`, a
+`.sha256` sidecar, and a notes file with the checksum appended. It syntax-checks both
+PowerShell files with the running parser, normalizes line endings to CRLF, and asserts
+that every archive entry exists and uses forward-slash separators. Nothing is published
+automatically — the `gh release create` command is printed at the end.
