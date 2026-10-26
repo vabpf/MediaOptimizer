@@ -11,9 +11,9 @@ subfolder that mirrors the source tree. No installer, no admin, no runtime prere
 | | |
 |---|---|
 | **App** | this branch — planned, see [implementation plan](docs/implementation-plan.md) |
-| **Scripted release** | `script` branch — a shipped PowerShell implementation with independent history |
+| **Scripted release** | `master-script` branch — a shipped PowerShell implementation with independent history |
 
-The `script` branch is a separate root commit, not a merged descendant: this app's history
+The `master-script` branch is a separate root commit, not a merged descendant: this app's history
 is free of PowerShell files by construction. The two branches are never merged.
 
 ## Planned stack
