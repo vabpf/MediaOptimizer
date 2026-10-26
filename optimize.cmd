@@ -1,3 +1,4 @@
-
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Tools\MediaOptimizer\OptimizeMedia.ps1" %*
+setlocal
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0optimize.ps1" %*
+exit /b %ERRORLEVEL%

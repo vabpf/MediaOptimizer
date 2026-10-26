@@ -12,7 +12,7 @@ replaces it.
 | | |
 |---|---|
 | `optimize.ps1` | Current implementation. Reference behaviour for the port. |
-| `optimize.cmd` | Launcher shim. **Currently broken** — it invokes `OptimizeMedia.ps1`, which does not exist. |
+| `optimize.cmd` | Launcher shim. Resolves `optimize.ps1` relative to its own location. |
 
 ## Current behaviour worth preserving
 
@@ -24,7 +24,6 @@ replaces it.
 
 ## Known defects to fix during the port
 
-- `optimize.cmd` points at a non-existent filename
 - Video pipeline hardcodes AMD AMF (`hevc_amf`, `d3d11va`) — fails on NVIDIA/Intel
 - Re-running silently overwrites `optimized/`
 
