@@ -4,15 +4,25 @@ Batch-optimizes a folder of videos and photos: HEVC for video, JPEG XL for still
 metadata and timestamps preserved, output written to an `optimized/` subfolder that
 mirrors the source tree.
 
-## Status
+## Releases
 
-**Pre-port.** The working implementation is a PowerShell script; a .NET desktop app
-replaces it.
+| Release | Contents | Status |
+|---|---|---|
+| **1 — scripted, portable** | `MediaOptimizer.cmd` + `launcher.ps1` + `optimize.ps1` | **shipping now** |
+| 2 — desktop app | .NET 10 / WPF portable app | planned, see [implementation plan](docs/implementation-plan.md) |
 
-| | |
+Release 1 needs only PowerShell (present on every Windows install); the media tools come
+from winget. It exists to ship value now and to pressure-test the wizard wording before
+it is rebuilt in XAML.
+
+## Entry points
+
+| File | Purpose |
 |---|---|
-| `optimize.ps1` | Current implementation. Reference behaviour for the port. |
-| `optimize.cmd` | Launcher shim. Resolves `optimize.ps1` relative to its own location. |
+| `MediaOptimizer.cmd` | **Interactive.** Double-click it, or drop a folder onto it. |
+| `launcher.ps1` | Prompt, path validation, dependency heads-up. Wraps `optimize.ps1` without modifying it. |
+| `optimize.cmd` | **Non-interactive.** For scripts and scheduled tasks. |
+| `optimize.ps1` | The engine. Reference behaviour for the .NET port. |
 
 ## Current behaviour worth preserving
 
