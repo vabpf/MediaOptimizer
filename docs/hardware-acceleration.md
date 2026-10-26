@@ -42,8 +42,10 @@ the test clip is generated with `lavfi`, so probing works before any media is ch
 ### Stage 0 — Cache
 
 Fingerprint = `gpuName` + `driverVersion` + `ffmpegVersion` + `ffmpegBuildHash` +
-`schemaVersion`. Stored at `%LOCALAPPDATA%\MediaOptimizer\hardware.json`. A matching
-fingerprint skips stages 1–4, so the normal launch path costs ~0ms.
+`schemaVersion`. Stored at `<app>\data\hardware.json`, falling back to
+`%LOCALAPPDATA%\MediaOptimizer\hardware.json` when the app folder is read-only (portable
+media, locked-down share). A matching fingerprint skips stages 1–4, so the normal launch
+path costs ~0ms.
 
 ### Stage 1 — Enumerate
 

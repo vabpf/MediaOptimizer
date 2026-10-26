@@ -29,11 +29,12 @@ replaces it.
 
 ## Planned stack
 
-.NET 10 LTS · WPF + WPF-UI · unpackaged framework-dependent build · Inno Setup
-installer chaining the .NET Desktop Runtime.
+.NET 10 LTS · WPF + WPF-UI · **portable** — self-contained single-file exe, no installer,
+no admin, data stored beside the exe.
 
-Dependencies are **user-installed** and detected at launch, with both a guided install
-path (`winget`) and a manual "locate the binary" fallback.
+Media dependencies are **system-installed via winget** and resolved from `PATH` at
+launch, with a manual "locate the binary" fallback for tools winget does not carry
+(`cjpegli`).
 
 ## Docs
 
