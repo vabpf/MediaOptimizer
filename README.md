@@ -6,7 +6,7 @@ source tree.
 
 This branch is the **maintenance line**: a portable PowerShell implementation that needs
 nothing installed except the media tools. Correctness and wording fixes only — new
-features go to the app on the `main` branch, which is a separate root commit.
+features go to the app on the `master-app` branch, which is a separate root commit.
 
 ## Requirements
 
