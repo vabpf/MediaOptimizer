@@ -1,14 +1,17 @@
 <#
     Media Optimizer - interactive launcher (the double-click entry point).
 
-    Wraps optimize.ps1 with a folder prompt, friendly wording and a dependency
-    heads-up. optimize.ps1 is deliberately NOT modified: it stays the behavioural
-    reference for the .NET port (see docs/implementation-plan.md).
+    Wraps optimize.ps1 with a file-or-folder prompt, path validation and a
+    dependency check scoped to what is actually being processed: a folder of MP4
+    only needs ffmpeg, a folder of JPG only needs cjpegli, and a mixed folder
+    needs both. exiftool is always optional.
+
+    optimize.ps1 is called through its own -Path contract and nothing else.
 
     Usage
-        MediaOptimizer.cmd                   prompts for a folder
-        MediaOptimizer.cmd "D:\Photos"       skips the prompt
-        Drop a folder onto MediaOptimizer.cmd in Explorer - same as above.
+        MediaOptimizer.cmd                    prompts for a folder or file
+        MediaOptimizer.cmd "D:\Photos"        skips the prompt
+        Drop a folder or file onto MediaOptimizer.cmd in Explorer - same as above.
 
     Written for Windows PowerShell 5.1 (no PS7-only syntax).
 #>
@@ -31,23 +34,35 @@ function Show-Banner {
     Write-Host ''
     Write-Host '  MEDIA OPTIMIZER' -ForegroundColor Cyan
     Write-Host "  $rule" -ForegroundColor DarkGray
-    Write-Host '  Shrinks the videos and photos in a folder.'
-    Write-Host '  Results go into an "optimized" subfolder - your originals are'
-    Write-Host '  never changed or deleted.'
+    Write-Host '  Shrinks videos and photos - a whole folder, or a single file.'
+    Write-Host '  Results go into an "optimized" subfolder beside it, so your'
+    Write-Host '  originals are never changed or deleted.'
 }
 
 function Show-PromptHelp {
     Write-Host ''
-    Write-Host '  Drag a folder into this window, or paste its path, then press' -ForegroundColor White
-    Write-Host '  Enter.' -ForegroundColor White
+    Write-Host '  Drag a folder or a file into this window, or paste its path,' -ForegroundColor White
+    Write-Host '  then press Enter.' -ForegroundColor White
     Write-Host ''
     Write-Host '  Pressing Enter on an empty line quits.' -ForegroundColor DarkGray
     Write-Host ''
 }
 
-# Explorer wraps dragged paths in quotes; tolerate those and a stray trailing
-# separator, and expand %VARS%.
-function Resolve-TargetFolder {
+function Format-Count {
+    param(
+        [int]$Count,
+        [string]$Singular
+    )
+
+    if ($Count -eq 1) {
+        return "1 $Singular"
+    }
+
+    return "$Count ${Singular}s"
+}
+
+# Explorer wraps dragged paths in quotes; tolerate those and expand %VARS%.
+function Resolve-Target {
     param([string]$InputText)
 
     $value = $InputText.Trim()
@@ -67,75 +82,153 @@ function Resolve-TargetFolder {
         return $null
     }
 
-    if (Test-Path -LiteralPath $value -PathType Container) {
-        return (Get-Item -LiteralPath $value).FullName
+    if (-not (Test-Path -LiteralPath $value)) {
+        throw "Not found: $value"
     }
 
-    if (Test-Path -LiteralPath $value -PathType Leaf) {
-        throw "That is a file, not a folder: $value"
-    }
+    $item = Get-Item -LiteralPath $value
 
-    throw "That folder does not exist: $value"
+    return [pscustomobject]@{
+        FullName = $item.FullName
+        IsFile   = -not $item.PSIsContainer
+    }
 }
 
-# Informational only - optimize.ps1 still decides what each file needs.
-function Show-MissingTools {
-    $checks = @(
-        @{
-            Label   = 'ffmpeg + ffprobe'
-            Tools   = @('ffmpeg', 'ffprobe')
-            Need    = 'shrink videos'
-            Install = 'winget install Gyan.FFmpeg'
-        },
-        @{
-            Label   = 'cjpegli'
-            Tools   = @('cjpegli')
-            Need    = 'shrink photos'
-            Install = 'github.com/libjxl/libjxl/releases'
-        },
-        @{
-            Label   = 'exiftool'
-            Tools   = @('exiftool')
-            Need    = 'keep original timestamps'
-            Install = 'winget install PhilHarvey.ExifTool'
+# Counts what the engine will actually process, using the same exclusion rules,
+# so the preflight can never promise more than the run delivers.
+function Get-MediaSummary {
+    param($Target)
+
+    $summary = [pscustomobject]@{
+        VideoCount = 0
+        ImageCount = 0
+        Found      = $false
+    }
+
+    if ($Target.IsFile) {
+        $extension = [System.IO.Path]::GetExtension($Target.FullName).ToLowerInvariant()
+
+        if ($extension -eq '.mp4' -or $extension -eq '.mov') {
+            $summary.VideoCount = 1
         }
-    )
+        elseif ($extension -eq '.jpg' -or $extension -eq '.jpeg') {
+            $summary.ImageCount = 1
+        }
 
-    $missing = @()
+        $summary.Found = ($summary.VideoCount + $summary.ImageCount) -gt 0
+        return $summary
+    }
 
-    foreach ($check in $checks) {
-        $present = $false
+    foreach ($file in (Get-ChildItem -LiteralPath $Target.FullName -Recurse -File -ErrorAction SilentlyContinue)) {
+        if ($file.FullName -match '[\\/]+optimized([\\/]|$)') {
+            continue
+        }
 
-        foreach ($tool in $check.Tools) {
-            if (Get-Command -Name $tool -ErrorAction SilentlyContinue) {
-                $present = $true
+        if ($file.Name -like 'opt_*') {
+            continue
+        }
+
+        $extension = $file.Extension.ToLowerInvariant()
+
+        if ($extension -eq '.mp4' -or $extension -eq '.mov') {
+            $summary.VideoCount++
+        }
+        elseif ($extension -eq '.jpg' -or $extension -eq '.jpeg') {
+            $summary.ImageCount++
+        }
+    }
+
+    $summary.Found = ($summary.VideoCount + $summary.ImageCount) -gt 0
+    return $summary
+}
+
+function Format-MediaSummary {
+    param($Summary)
+
+    $parts = @()
+
+    if ($Summary.VideoCount -gt 0) {
+        $parts += (Format-Count -Count $Summary.VideoCount -Singular 'video')
+    }
+
+    if ($Summary.ImageCount -gt 0) {
+        $parts += (Format-Count -Count $Summary.ImageCount -Singular 'photo')
+    }
+
+    return ($parts -join ', ')
+}
+
+# Returns $true when the run can start. Only tools this selection needs block it.
+function Test-Requirements {
+    param($Summary)
+
+    $required = @()
+    $optional = @()
+
+    if ($Summary.VideoCount -gt 0) {
+        if (-not (Get-Command -Name 'ffmpeg' -ErrorAction SilentlyContinue)) {
+            $required += [pscustomobject]@{
+                Tool    = 'ffmpeg'
+                Reason  = "needed to shrink $(Format-Count -Count $Summary.VideoCount -Singular 'video')"
+                Install = 'winget install Gyan.FFmpeg'
             }
         }
-
-        if (-not $present) {
-            $missing += $check
+        elseif (-not (Get-Command -Name 'ffprobe' -ErrorAction SilentlyContinue)) {
+            $optional += [pscustomobject]@{
+                Tool    = 'ffprobe'
+                Reason  = 'video progress percentages will be unavailable'
+                Install = 'winget install Gyan.FFmpeg'
+            }
         }
     }
 
-    if ($missing.Count -eq 0) {
-        return
+    if ($Summary.ImageCount -gt 0 -and -not (Get-Command -Name 'cjpegli' -ErrorAction SilentlyContinue)) {
+        $required += [pscustomobject]@{
+            Tool    = 'cjpegli'
+            Reason  = "needed to shrink $(Format-Count -Count $Summary.ImageCount -Singular 'photo')"
+            Install = 'download from github.com/libjxl/libjxl/releases'
+        }
     }
 
-    Write-Host ''
-    Write-Host '  Some helper tools are missing on this PC:' -ForegroundColor Yellow
+    if (-not (Get-Command -Name 'exiftool' -ErrorAction SilentlyContinue)) {
+        $optional += [pscustomobject]@{
+            Tool    = 'exiftool'
+            Reason  = 'timestamps and photo metadata will not be preserved'
+            Install = 'winget install PhilHarvey.ExifTool'
+        }
+    }
 
-    foreach ($check in $missing) {
+    if ($required.Count -gt 0) {
         Write-Host ''
-        Write-Host ("    {0}  - for {1}" -f $check.Label, $check.Need) -ForegroundColor Yellow
-        Write-Host ("      {0}" -f $check.Install) -ForegroundColor DarkGray
+        Write-Host '  Missing a tool that this selection needs:' -ForegroundColor Red
+
+        foreach ($item in $required) {
+            Write-Host ''
+            Write-Host ("    {0}  - {1}" -f $item.Tool, $item.Reason) -ForegroundColor Yellow
+            Write-Host ("      {0}" -f $item.Install) -ForegroundColor DarkGray
+        }
+
+        Write-Host ''
+        Write-Host '  Install it, then run this window again.' -ForegroundColor White
+        return $false
     }
 
-    Write-Host ''
-    Write-Host '  You can continue anyway; only the files that need a missing' -ForegroundColor DarkGray
-    Write-Host '  tool will fail.' -ForegroundColor DarkGray
-    Write-Host ''
-    Write-Host '  Press Enter to continue, or Ctrl+C to stop and install first.' -ForegroundColor White
-    [void](Read-Host)
+    if ($optional.Count -gt 0) {
+        Write-Host ''
+        Write-Host '  Heads up:' -ForegroundColor Yellow
+
+        foreach ($item in $optional) {
+            Write-Host ''
+            Write-Host ("    {0}  - {1}" -f $item.Tool, $item.Reason) -ForegroundColor Yellow
+            Write-Host ("      {0}" -f $item.Install) -ForegroundColor DarkGray
+        }
+
+        Write-Host ''
+        Write-Host '  Press Enter to continue, or Ctrl+C to stop.' -ForegroundColor White
+        [void](Read-Host)
+    }
+
+    return $true
 }
 
 # ------------------------------------------------------------------------ main
@@ -152,23 +245,38 @@ if (-not (Test-Path -LiteralPath $enginePath -PathType Leaf)) {
 Show-Banner
 
 $target = $null
+$summary = $null
 
-# A folder dropped onto the .cmd arrives here as -Path.
+# A folder or file dropped onto the .cmd arrives here as -Path.
 if (-not [string]::IsNullOrWhiteSpace($Path)) {
     try {
-        $target = Resolve-TargetFolder -InputText $Path
+        $candidate = Resolve-Target -InputText $Path
     }
     catch {
         Write-Host ''
         Write-Host "  $($_.Exception.Message)" -ForegroundColor Red
+        $candidate = $null
+    }
+
+    if ($null -ne $candidate) {
+        $candidateSummary = Get-MediaSummary -Target $candidate
+
+        if ($candidateSummary.Found) {
+            $target = $candidate
+            $summary = $candidateSummary
+        }
+        else {
+            Write-Host ''
+            Write-Host '  No MP4, MOV, JPG or JPEG found in that selection.' -ForegroundColor Yellow
+        }
     }
 }
 
-if (-not $target) {
+if ($null -eq $target) {
     Show-PromptHelp
 
-    while (-not $target) {
-        $entered = Read-Host '  Folder'
+    while ($null -eq $target) {
+        $entered = Read-Host '  Folder or file'
 
         if ([string]::IsNullOrWhiteSpace($entered)) {
             Write-Host ''
@@ -177,21 +285,45 @@ if (-not $target) {
         }
 
         try {
-            $target = Resolve-TargetFolder -InputText $entered
+            $candidate = Resolve-Target -InputText $entered
         }
         catch {
             Write-Host "  $($_.Exception.Message)" -ForegroundColor Red
             Write-Host '  Try again, or press Enter to quit.' -ForegroundColor DarkGray
             Write-Host ''
+            continue
         }
+
+        $candidateSummary = Get-MediaSummary -Target $candidate
+
+        if (-not $candidateSummary.Found) {
+            Write-Host '  No MP4, MOV, JPG or JPEG found there.' -ForegroundColor Yellow
+            Write-Host '  Try another folder or file, or press Enter to quit.' -ForegroundColor DarkGray
+            Write-Host ''
+            continue
+        }
+
+        $target = $candidate
+        $summary = $candidateSummary
     }
 }
 
 Write-Host ''
-Write-Host "  Folder: $target" -ForegroundColor Cyan
+
+if ($target.IsFile) {
+    Write-Host "  File:   $($target.FullName)" -ForegroundColor Cyan
+}
+else {
+    Write-Host "  Folder: $($target.FullName)" -ForegroundColor Cyan
+}
+
+Write-Host "  Media:  $(Format-MediaSummary -Summary $summary)" -ForegroundColor Cyan
 Write-Host "  $rule" -ForegroundColor DarkGray
 
-Show-MissingTools
+if (-not (Test-Requirements -Summary $summary)) {
+    Write-Host ''
+    exit 1
+}
 
 Write-Host ''
 Write-Host '  Starting. Press Ctrl+C to cancel.' -ForegroundColor DarkGray
@@ -201,7 +333,7 @@ $LASTEXITCODE = 0
 $exitCode = 0
 
 try {
-    & $enginePath -Path $target
+    & $enginePath -Path $target.FullName
     $exitCode = $LASTEXITCODE
 }
 catch {

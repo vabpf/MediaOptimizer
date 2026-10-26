@@ -10,12 +10,27 @@ $ErrorActionPreference = 'Continue'
 
 $Path = [Environment]::ExpandEnvironmentVariables($Path.Trim().Trim('"'))
 
-if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
-    Write-Host "[ERROR] Folder not found: $Path" -ForegroundColor Red
+if (-not (Test-Path -LiteralPath $Path)) {
+    Write-Host "[ERROR] Not found: $Path" -ForegroundColor Red
     exit 1
 }
 
-$baseDir = (Get-Item -LiteralPath $Path).FullName
+$targetItem = Get-Item -LiteralPath $Path
+$singleFile = -not $targetItem.PSIsContainer
+
+if ($singleFile) {
+    if ($targetItem.Extension.ToLowerInvariant() -notmatch '^\.(mp4|mov|jpg|jpeg)$') {
+        Write-Host "[ERROR] Unsupported file type: $($targetItem.Name)" -ForegroundColor Red
+        Write-Host "Supported types: MP4, MOV, JPG, JPEG" -ForegroundColor Yellow
+        exit 1
+    }
+
+    $baseDir = $targetItem.DirectoryName
+}
+else {
+    $baseDir = $targetItem.FullName
+}
+
 $outputDir = Join-Path $baseDir 'optimized'
 
 # ============================================================
@@ -31,7 +46,12 @@ Write-Host "========================================================" -Foregroun
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 Write-Host ""
-Write-Host "Target Directory: $baseDir" -ForegroundColor Cyan
+if ($singleFile) {
+    Write-Host "Target File:      $($targetItem.FullName)" -ForegroundColor Cyan
+}
+else {
+    Write-Host "Target Directory: $baseDir" -ForegroundColor Cyan
+}
 Write-Host "Output Directory: $outputDir" -ForegroundColor Cyan
 Write-Host "--------------------------------------------------------" -ForegroundColor DarkGray
 
@@ -48,22 +68,28 @@ $exiftoolAvailable = [bool](Get-Command exiftool -ErrorAction SilentlyContinue)
 # RECURSIVE FILE DISCOVERY
 # ============================================================
 
-Write-Host "[INFO] Scanning folder and subfolders..." -ForegroundColor Yellow
-
-try {
-    $files = @(
-        Get-ChildItem -LiteralPath $baseDir -Recurse -File -ErrorAction Stop |
-            Where-Object {
-                $_.Extension -match '^\.(mp4|mov|jpg|jpeg)$' -and
-                $_.FullName -notmatch '[\\/]+optimized([\\/]|$)' -and
-                $_.Name -notlike 'opt_*'
-            }
-    )
+if ($singleFile) {
+    Write-Host "[INFO] Preparing single file..." -ForegroundColor Yellow
+    $files = @($targetItem)
 }
-catch {
-    Write-Host "[ERROR] Could not scan the selected folder." -ForegroundColor Red
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    return
+else {
+    Write-Host "[INFO] Scanning folder and subfolders..." -ForegroundColor Yellow
+
+    try {
+        $files = @(
+            Get-ChildItem -LiteralPath $baseDir -Recurse -File -ErrorAction Stop |
+                Where-Object {
+                    $_.Extension -match '^\.(mp4|mov|jpg|jpeg)$' -and
+                    $_.FullName -notmatch '[\\/]+optimized([\\/]|$)' -and
+                    $_.Name -notlike 'opt_*'
+                }
+        )
+    }
+    catch {
+        Write-Host "[ERROR] Could not scan the selected folder." -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        return
+    }
 }
 
 $totalFiles = $files.Count
@@ -87,7 +113,9 @@ $hasImage = [bool]($files | Where-Object {
 })
 
 if ($hasVideo -and !$ffmpegAvailable) {
-    Write-Host "[ERROR] FFmpeg was not found in PATH." -ForegroundColor Red
+    Write-Host "[ERROR] ffmpeg was not found in PATH." -ForegroundColor Red
+    Write-Host "        It is needed for the video files in this selection." -ForegroundColor Red
+    Write-Host "        Install with: winget install Gyan.FFmpeg" -ForegroundColor Yellow
     return
 }
 
@@ -97,6 +125,8 @@ if ($hasVideo -and !$ffprobeAvailable) {
 
 if ($hasImage -and !$cjpegliAvailable) {
     Write-Host "[ERROR] cjpegli was not found in PATH." -ForegroundColor Red
+    Write-Host "        It is needed for the photos in this selection." -ForegroundColor Red
+    Write-Host "        Download it from: https://github.com/libjxl/libjxl/releases" -ForegroundColor Yellow
     return
 }
 

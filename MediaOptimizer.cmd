@@ -8,7 +8,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0launcher.ps1" %*
 set "CODE=%ERRORLEVEL%"
 
 echo.
-if not "%CODE%"=="0" echo   Finished with errors - exit code %CODE%.
+if not "%CODE%"=="0" echo   Stopped - exit code %CODE%.
 echo   Press any key to close this window.
 pause >nul
 
