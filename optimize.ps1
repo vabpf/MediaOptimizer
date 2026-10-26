@@ -328,6 +328,10 @@ foreach ($file in $files) {
                 '-qp_i', '28',
                 '-qp_p', '28',
                 '-qp_b', '30',
+                # Apple players only accept HEVC in MP4 when the sample entry is
+                # tagged hvc1; ffmpeg defaults to hev1. Android, Windows and the
+                # major players accept either, so this costs nothing.
+                '-tag:v', 'hvc1',
                 '-movflags', 'use_metadata_tags+write_colr',
                 '-c:a', 'aac',
                 '-b:a', '128k',
