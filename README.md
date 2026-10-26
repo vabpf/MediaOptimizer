@@ -1,62 +1,41 @@
-# MediaOptimizer
+# MediaOptimizer (scripted release)
 
-Batch-optimizes a folder of videos and photos: HEVC for video, JPEG XL for stills,
-metadata and timestamps preserved, output written to an `optimized/` subfolder that
-mirrors the source tree.
+Batch-shrinks a folder of videos and photos: HEVC for video, JPEG XL for stills, metadata
+and timestamps preserved, results written to an `optimized/` subfolder that mirrors the
+source tree.
 
-## Releases
+This branch is the **maintenance line**: a portable PowerShell implementation that needs
+nothing installed except the media tools. Correctness and wording fixes only — new
+features go to the app on the `main` branch, which is a separate root commit.
 
-| Release | Contents | Status |
+## Requirements
+
+PowerShell (present on every Windows install) plus three tools on `PATH`:
+
+| Tool | Needed for | Install |
 |---|---|---|
-| **1 — scripted, portable** | `MediaOptimizer.cmd` + `launcher.ps1` + `optimize.ps1` | **shipping now** |
-| 2 — desktop app | .NET 10 / WPF portable app | planned, see [implementation plan](docs/implementation-plan.md) |
+| `ffmpeg` / `ffprobe` | videos | `winget install Gyan.FFmpeg` |
+| `cjpegli` | photos | Not on winget — libjxl releases |
+| `exiftool` | timestamps (optional) | `winget install PhilHarvey.ExifTool` |
 
-Release 1 needs only PowerShell (present on every Windows install); the media tools come
-from winget. It exists to ship value now and to pressure-test the wizard wording before
-it is rebuilt in XAML.
+Only what the folder actually contains is required: photos do not need `ffmpeg`, videos
+do not need `cjpegli`, and `exiftool` is optional.
 
-## Entry points
+## Usage
 
 | File | Purpose |
 |---|---|
 | `MediaOptimizer.cmd` | **Interactive.** Double-click it, or drop a folder onto it. |
-| `launcher.ps1` | Prompt, path validation, dependency heads-up. Wraps `optimize.ps1` without modifying it. |
+| `launcher.ps1` | Prompt, path validation, dependency heads-up. |
 | `optimize.cmd` | **Non-interactive.** For scripts and scheduled tasks. |
-| `optimize.ps1` | The engine. Reference behaviour for the .NET port. |
+| `optimize.ps1` | The engine. Unmodified; `launcher.ps1` only supplies `-Path`. |
 
-## Current behaviour worth preserving
+Supported input: MP4, MOV, JPG, JPEG — scanned recursively. Existing `optimized/` folders
+and `opt_*` files are skipped, so re-running does not reprocess its own output.
 
-- Recursive scan of MP4, MOV, JPG, JPEG; skips `optimized/` and `opt_*` files
-- Per-media-type dependency gating: `ffmpeg` required only if videos exist,
-  `cjpegli` only if stills exist
-- Timestamps and EXIF carried over via `exiftool` (optional, degrades gracefully)
-- Live progress + batch ETA from `ffmpeg -progress`
+## Behaviour
 
-## Known defects to fix during the port
-
-- Video pipeline hardcodes AMD AMF (`hevc_amf`, `d3d11va`) — fails on NVIDIA/Intel
-- Re-running silently overwrites `optimized/`
-
-## Planned stack
-
-.NET 10 LTS · WPF + WPF-UI · **portable** — self-contained single-file exe, no installer,
-no admin, data stored beside the exe.
-
-Media dependencies are **system-installed via winget** and resolved from `PATH` at
-launch, with a manual "locate the binary" fallback for tools winget does not carry
-(`cjpegli`).
-
-## Docs
-
-- [Implementation plan](docs/implementation-plan.md) — locked decisions, milestones,
-  behaviour-parity checklist, risks
-- [Hardware acceleration detection](docs/hardware-acceleration.md) — why encoder
-  enumeration is insufficient, the probe/benchmark pipeline, and per-encoder profiles
-
-## External tools
-
-| Tool | Purpose | Install |
-|---|---|---|
-| `ffmpeg` / `ffprobe` | Video transcode, duration probing | `winget install Gyan.FFmpeg` |
-| `cjpegli` | JPEG XL still encoding | Not on winget — libjxl releases |
-| `exiftool` | Metadata and timestamp preservation | `winget install PhilHarvey.ExifTool` |
+- Originals are never modified; output mirrors the source tree under `optimized/`
+- Live progress, per-file savings, and a batch ETA
+- Failures are isolated per file and reported with the tool's own diagnostics
+- Video timestamps and photo EXIF are carried over via `exiftool` when available
